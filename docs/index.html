@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Can a Simple Classifier Identify Declining Content? An Honest Validation on 30K Pages</title>
+<meta name="description" content="A validation audit of a Random Forest classifier for predicting declining SEO content, built on 30,000 content items across 32 clients.">
+<style>
+  :root {
+    --text: #1a1a2e;
+    --bg: #fafafa;
+    --card: #ffffff;
+    --accent: #2563eb;
+    --muted: #6b7280;
+    --border: #e5e7eb;
+    --code-bg: #f3f4f6;
+    --warning: #f59e0b;
+    --pass: #10b981;
+    --fail: #ef4444;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    color: var(--text);
+    background: var(--bg);
+    line-height: 1.7;
+    font-size: 17px;
+  }
+  .container {
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+  }
+  header {
+    text-align: center;
+    padding: 3rem 0 2rem;
+    border-bottom: 2px solid var(--text);
+    margin-bottom: 2.5rem;
+  }
+  header h1 {
+    font-size: 2rem;
+    line-height: 1.3;
+    margin-bottom: 0.75rem;
+    font-weight: 700;
+  }
+  .authors {
+    font-size: 0.95rem;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+  }
+  .venue {
+    font-size: 0.85rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  h2 {
+    font-size: 1.4rem;
+    margin: 2.5rem 0 1rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 1px solid var(--border);
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 600;
+  }
+  h3 {
+    font-size: 1.15rem;
+    margin: 1.5rem 0 0.75rem;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 600;
+  }
+  p { margin-bottom: 1rem; }
+  .abstract {
+    background: var(--card);
+    border-left: 4px solid var(--accent);
+    padding: 1.25rem 1.5rem;
+    margin: 1.5rem 0 2rem;
+    border-radius: 0 6px 6px 0;
+  }
+  .abstract h2 { border: none; margin: 0 0 0.75rem; font-size: 1.1rem; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.25rem 0;
+    font-size: 0.92rem;
+  }
+  th, td {
+    padding: 0.6rem 0.8rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  th {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 600;
+    background: var(--code-bg);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  tr:hover td { background: #f9fafb; }
+  .figure {
+    margin: 2rem 0;
+    text-align: center;
+  }
+  .figure img {
+    max-width: 100%;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+  }
+  .figure figcaption {
+    font-size: 0.88rem;
+    color: var(--muted);
+    margin-top: 0.5rem;
+    font-style: italic;
+  }
+  .callout {
+    background: #fffbeb;
+    border-left: 4px solid var(--warning);
+    padding: 1rem 1.25rem;
+    margin: 1.5rem 0;
+    border-radius: 0 6px 6px 0;
+    font-size: 0.95rem;
+  }
+  .callout.pass {
+    background: #ecfdf5;
+    border-left-color: var(--pass);
+  }
+  .callout.fail {
+    background: #fef2f2;
+    border-left-color: var(--fail);
+  }
+  code {
+    font-family: 'SF Mono', 'Consolas', monospace;
+    background: var(--code-bg);
+    padding: 0.15rem 0.4rem;
+    border-radius: 3px;
+    font-size: 0.88em;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 1rem;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin: 1rem 0;
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+  pre code { background: none; padding: 0; }
+  ul, ol { margin: 0.75rem 0 1rem 1.5rem; }
+  li { margin-bottom: 0.4rem; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .toc {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1.25rem 1.5rem;
+    margin: 1.5rem 0;
+  }
+  .toc h3 { margin: 0 0 0.75rem; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .toc ol { margin: 0; list-style: decimal; }
+  .toc li { margin-bottom: 0.3rem; font-size: 0.92rem; }
+  .metric-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+  }
+  .metric-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem;
+    text-align: center;
+  }
+  .metric-card .value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    color: var(--accent);
+  }
+  .metric-card .label {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-top: 0.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  footer {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 2px solid var(--text);
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  @media (max-width: 600px) {
+    .container { padding: 1rem; }
+    header h1 { font-size: 1.5rem; }
+    h2 { font-size: 1.2rem; }
+    .metric-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>Can a Simple Classifier Identify Declining Content? An Honest Validation on 30K Pages</h1>
+  <div class="authors">ML Internship Capstone &middot; FlyRank Research</div>
+  <div class="venue">July 2026</div>
+</header>
+
+<div class="abstract">
+  <h2>Abstract</h2>
+  <p>Content teams managing large SEO portfolios need a way to prioritize which pages to refresh, but manual triage does not scale. We trained a Random Forest classifier on 30,000 content items across 32 clients to predict whether a page is in a declining trend, using traffic, position, and staleness features. On a client-grouped holdout set, the model achieved precision@50 of 58% (base rate 54.2%) and AUC of 0.61 &mdash; a modest 3.8-point lift over random selection. A simpler Logistic Regression outperformed the forest (precision@50 = 74%), contradicting the hypothesis that non-linear interactions matter for this task. Cross-validation across five client groups showed high variance (70.8% &plusmn; 18.4%), indicating the model is fragile across different client portfolios. We conclude that while the model provides a directional signal for triage, it is not production-ready: the lift is small, the signal is dominated by a single feature (average position), and the model is descriptive rather than predictive. This paper presents the full validation audit, including leakage checks, honest claim rewrites, and a practical action playbook with human-review guardrails.</p>
+</div>
+
+<nav class="toc">
+  <h3>Contents</h3>
+  <ol>
+    <li><a href="#introduction">Introduction</a></li>
+    <li><a href="#data">Data</a></li>
+    <li><a href="#methodology">Methodology</a></li>
+    <li><a href="#results">Results</a></li>
+    <li><a href="#limitations">Limitations &amp; Honest Framing</a></li>
+    <li><a href="#recommendations">Ranked Recommendations</a></li>
+    <li><a href="#reproducibility">Reproducibility</a></li>
+    <li><a href="#acknowledgments">Acknowledgments &amp; Data Credit</a></li>
+  </ol>
+</nav>
+
+<h2 id="introduction">1. Introduction</h2>
+
+<p>Managing a large content portfolio means making hard choices about where to invest limited refresh budget. A team overseeing 30,000 content items cannot manually review every page each quarter. The obvious question: can a machine learning model rank pages by their likelihood of declining, so humans can focus their attention on the most promising candidates?</p>
+
+<p>This matters because the cost of inaction is real. Pages that were once visible can decay quietly, losing impressions and clicks over months. But refreshing the wrong pages wastes expert time that could be spent elsewhere. A good triage tool would let the team focus on pages where a refresh is most likely to matter.</p>
+
+<p>We built a classifier to answer this question. What we found is more nuanced than a simple "yes" or "no." The model provides a weak but real signal &mdash; enough to be a starting point for human review, but not enough to automate decisions. This paper tells the honest story of what we built, what it can do, and where it stops being useful.</p>
+
+<h2 id="data">2. Data</h2>
+
+<p>We used the <strong>FlyRank ML Internship Starter Dataset</strong>, a pseudonymized collection of content performance data. The dataset contains 30,000 rows &mdash; one per content item &mdash; across 32 anonymized clients, with trailing-90-day metrics from Google Search Console and Google Analytics 4.</p>
+
+<h3>Key characteristics</h3>
+<table>
+  <tr><th>Property</th><th>Value</th></tr>
+  <tr><td>Total rows</td><td>30,000</td></tr>
+  <tr><td>Unique clients</td><td>32</td></tr>
+  <tr><td>Columns</td><td>44 (traffic, position, engagement, content metadata)</td></tr>
+  <tr><td>Label</td><td><code>trend_direction</code> ("down" = declining, 54.2% base rate)</td></tr>
+  <tr><td>Filter applied</td><td><code>impressions_90d &gt; 0</code> AND <code>content_age_days &gt;= 90</code></td></tr>
+  <tr><td>Rows after filter</td><td>30,000 (all rows pass)</td></tr>
+</table>
+
+<h3>What we excluded and why</h3>
+<ul>
+  <li><strong>Content with zero impressions:</strong> Pages with no search visibility cannot be evaluated for decline &mdash; there is nothing to decline from.</li>
+  <li><strong>Content younger than 90 days:</strong> New pages have not had enough time to establish a trend. Including them would conflate "new" with "declining."</li>
+  <li><strong>Duplicate content IDs:</strong> Kept only the first occurrence of each <code>content_id</code> to avoid double-counting.</li>
+</ul>
+
+<h3>Public safety</h3>
+<p>All client identifiers are pseudonymized. No private URLs, query strings, or real client names appear in this paper or the accompanying code. Rate columns (CTR, engagement rate, scroll rate) are stored as percentages (e.g., <code>ctr = 0.76</code> means 0.76%, not 76%). The column <code>avg_position = 0</code> means "no data," not rank zero.</p>
+
+<h2 id="methodology">3. Methodology</h2>
+
+<h3>Label definition</h3>
+<p>The label <code>is_declining</code> is derived from <code>trend_direction</code>, which is computed from a 30-day trend comparison of impressions. A page is labeled "declining" if its recent 30-day impressions are trending downward. This is a current-state label, not a future prediction.</p>
+
+<h3>Features</h3>
+<p>We used 26 features: 18 numeric (impressions, clicks, sessions, position, CTR, content age, staleness, word count, etc.) and 8 categorical (competition level, content type, intent, age tier, impression tier, etc.). All numeric columns were filled with 0 for NaN; categoricals were filled with "unknown."</p>
+
+<h3>Model</h3>
+<p>A <strong>Random Forest classifier</strong> (200 trees, max depth 10, min samples leaf 20) was the primary model. A <strong>Logistic Regression</strong> (max iterations 5000) was trained for comparison.</p>
+
+<h3>Validation design</h3>
+<div class="callout">
+  <strong>Why this matters:</strong> A random row-level split would let the model memorize client-specific patterns. We used <strong>GroupKFold</strong> and <strong>GroupShuffleSplit</strong>, both grouped by <code>client_id</code>, so every row from a given client is entirely in train or entirely in test.
+</div>
+
+<ul>
+  <li><strong>Holdout:</strong> 80/20 client-level split (25 clients train, 7 clients test)</li>
+  <li><strong>Cross-validation:</strong> 5-fold GroupKFold (each fold holds out 6&ndash;8 clients)</li>
+  <li><strong>Metrics:</strong> Precision@50 (primary), AUC-ROC, base rate reported alongside</li>
+</ul>
+
+<h3>Leakage checks</h3>
+<ul>
+  <li><strong>Label-derived features:</strong> <code>trend_direction</code> and <code>trend_pct</code> are excluded from features.</li>
+  <li><strong>Product flags:</strong> No health scores, optimization scores, or system-derived flags used as features.</li>
+  <li><strong>Time window overlap:</strong> Features are measured over 90 days; the label is a 30-day trend within that window. The model is <em>descriptive</em> (current state &rarr; current trend), not predictive (past state &rarr; future trend).</li>
+  <li><strong>Train-without-suspect:</strong> Removing <code>avg_position</code> drops precision@50 to 50% (base rate) &mdash; no collapse, but the model depends heavily on this single feature.</li>
+</ul>
+
+<h2 id="results">4. Results</h2>
+
+<div class="metric-grid">
+  <div class="metric-card">
+    <div class="value">58%</div>
+    <div class="label">RF Precision@50</div>
+  </div>
+  <div class="metric-card">
+    <div class="value">74%</div>
+    <div class="label">LR Precision@50</div>
+  </div>
+  <div class="metric-card">
+    <div class="value">0.61</div>
+    <div class="label">AUC-ROC</div>
+  </div>
+  <div class="metric-card">
+    <div class="value">54.2%</div>
+    <div class="label">Base Rate</div>
+  </div>
+</div>
+
+<h3>Model vs baseline comparison</h3>
+<table>
+  <tr><th>Method</th><th>P@10</th><th>P@20</th><th>P@50</th><th>AUC</th></tr>
+  <tr><td>Base rate (majority class)</td><td>51.1%</td><td>51.1%</td><td>51.1%</td><td>&mdash;</td></tr>
+  <tr><td>Logistic Regression</td><td>90.0%</td><td>75.0%</td><td>74.0%</td><td>0.6092</td></tr>
+  <tr><td>Random Forest (holdout)</td><td>50.0%</td><td>65.0%</td><td>58.0%</td><td>0.6087</td></tr>
+  <tr><td>Random Forest (5-fold CV)</td><td>&mdash;</td><td>&mdash;</td><td>70.8% &plusmn; 18.4%</td><td>&mdash;</td></tr>
+</table>
+
+<h3>Key findings</h3>
+
+<p><strong>Finding 1: The simpler model wins.</strong> Logistic Regression (linear) outperforms Random Forest (non-linear) on precision@50 (74% vs 58%). This contradicts the hypothesis that non-linear interactions between staleness and content type are important for this task. The signal in these features appears to be approximately linear.</p>
+
+<p><strong>Finding 2: The model is fragile across clients.</strong> Cross-validation shows a mean precision@50 of 70.8% but a standard deviation of 18.4%. Fold 5 (8 clients held out) achieved only 40% &mdash; barely below the base rate. The model's performance depends heavily on which clients happen to be in the test set.</p>
+
+<p><strong>Finding 3: One feature dominates.</strong> Average position accounts for the largest share of feature importance (built-in: 0.124, permutation: 0.130). Removing it drops the model to base rate. The model is effectively a position-based ranker, not a multi-signal decline detector.</p>
+
+<p><strong>Finding 4: The lift is modest.</strong> On the holdout set, the model flags declining content at 58% in the top 50, compared to 51.1% if content were selected at random. The 6.9-point lift is directionally positive but fragile.</p>
+
+<figure class="figure">
+  <img src="figures/playbook_overview.png" alt="Three-panel overview: score distribution, reason codes, and impressions vs decline score">
+  <figcaption>Figure 1. Left: distribution of model scores across 30K content items. Center: reason code distribution in the top-100 flagged items. Right: impressions vs decline score showing the model favors high-impression content.</figcaption>
+</figure>
+
+<h3>Feature importance</h3>
+<table>
+  <tr><th>Feature</th><th>Built-in Importance</th><th>Permutation Importance</th></tr>
+  <tr><td><code>days_with_impressions</code></td><td>0.163</td><td>0.010</td></tr>
+  <tr><td><code>log_impressions_90d</code></td><td>0.160</td><td>0.012</td></tr>
+  <tr><td><code>avg_position</code></td><td>0.124</td><td>0.130</td></tr>
+  <tr><td><code>content_age_days</code></td><td>0.109</td><td>0.003</td></tr>
+  <tr><td><code>word_count</code></td><td>0.054</td><td>0.001</td></tr>
+</table>
+
+<p>Permutation importance confirms <code>avg_position</code> as the dominant signal. Built-in importance over-weights <code>days_with_impressions</code> and <code>log_impressions_90d</code> due to their correlation with position.</p>
+
+<h2 id="limitations">5. Limitations &amp; Honest Framing</h2>
+
+<div class="callout fail">
+  <strong>What this work cannot claim:</strong>
+</div>
+
+<ol>
+  <li><strong>The model does not predict future decline.</strong> Features and label use overlapping time windows (90-day features, 30-day label within that window). The model describes current state, not future trajectory.</li>
+  <li><strong>The signal is weak.</strong> AUC of 0.61 is barely above random (0.50). Precision@50 of 58% vs base rate 51.1% is a 6.9-point lift &mdash; real but modest.</li>
+  <li><strong>The model is position-dominated.</strong> Removing average position drops performance to base rate. The model does not learn multi-signal interactions.</li>
+  <li><strong>Performance is fragile across clients.</strong> CV standard deviation of 18.4% means results vary wildly depending on which clients are tested. A model that works for one client portfolio may not work for another.</li>
+  <li><strong>This is observational data.</strong> We cannot claim that refreshing a flagged page will improve its ranking. We can only say the page looks like it might be declining, based on patterns in this dataset.</li>
+  <li><strong>The population is filtered.</strong> The model was trained on content with impressions &gt; 0 and age &ge; 90 days. Pages with no visibility or very new pages are excluded.</li>
+</ol>
+
+<h2 id="recommendations">6. Ranked Recommendations</h2>
+
+<p>The model produces a ranked queue of 100 content items for human review. Each item is assigned a reason code indicating why it was flagged. The queue is a <strong>triage tool</strong>, not a decision engine &mdash; every item requires GSC verification before action.</p>
+
+<h3>Reason codes</h3>
+<table>
+  <tr><th>Code</th><th>Meaning</th><th>Human check</th></tr>
+  <tr><td><code>VISIBILITY_DECAY</code></td><td>High impressions (1K+) + declining trend</td><td>Check GSC for position drops</td></tr>
+  <tr><td><code>STALE_CONTENT</code></td><td>No update in 180+ days</td><td>Are stats and dates current?</td></tr>
+  <tr><td><code>LOW_CTR_ON_PAGE1</code></td><td>Position 1&ndash;10 but CTR &lt; 0.5%</td><td>Is the title/meta compelling?</td></tr>
+  <tr><td><code>REFRESH_CANDIDATE</code></td><td>500+ impressions + 90+ days stale</td><td>High-value refresh target</td></tr>
+  <tr><td><code>THIN_CONTENT</code></td><td>&lt;1K words + 100+ impressions</td><td>Does this page need depth?</td></tr>
+  <tr><td><code>MODEL_FLAGGED</code></td><td>Score above threshold, no rule match</td><td>General review needed</td></tr>
+</table>
+
+<h3>What a human must check before acting</h3>
+<ol>
+  <li><strong>Verify the trend</strong> in GSC &mdash; the model is right ~58% of the time</li>
+  <li><strong>Check the reason code</strong> matches the page's actual situation</li>
+  <li><strong>Assess business value</strong> &mdash; 10 impressions declining to 5 is not a priority</li>
+  <li><strong>Check for cannibalization</strong> before refreshing (the research paper found 73.2M impressions tied up in overlapping demand)</li>
+  <li><strong>Estimate cost vs. benefit</strong> &mdash; the model does not estimate cost</li>
+</ol>
+
+<h3>What should never be automated</h3>
+<ul>
+  <li>Deleting or deindexing content</li>
+  <li>Rewriting content without reading it first</li>
+  <li>Changing URL structure or redirects</li>
+  <li>Budget allocation across clients</li>
+  <li>Publishing changes without stakeholder sign-off</li>
+  <li>Using the score as a quality metric</li>
+  <li>Automated A/B testing based on model flags</li>
+</ul>
+
+<h2 id="reproducibility">7. Reproducibility</h2>
+
+<p>All code, data, and outputs are publicly available. To reproduce this work:</p>
+
+<pre><code># Clone the repository
+git clone https://github.com/ganeshpnsb/ML-INTERNSHIP.git
+cd ML-INTERNSHIP
+
+# Install dependencies
+pip install pandas numpy scikit-learn matplotlib jupyter
+
+# Run the notebooks in order
+jupyter notebook work/notebooks/w05_model.ipynb
+jupyter notebook work/notebooks/w06_validation_audit.ipynb
+jupyter notebook work/notebooks/w07_action_playbook.ipynb</code></pre>
+
+<h3>Notebooks</h3>
+<table>
+  <tr><th>Notebook</th><th>Purpose</th></tr>
+  <tr><td><code>w05_model.ipynb</code></td><td>Model training and evaluation (RF, LR, GroupKFold CV)</td></tr>
+  <tr><td><code>w06_validation_audit.ipynb</code></td><td>Leakage audit, paper methodology review, claim rewrites</td></tr>
+  <tr><td><code>w07_action_playbook.ipynb</code></td><td>Ranked queue generation, reason codes, exports</td></tr>
+</table>
+
+<h3>Outputs</h3>
+<table>
+  <tr><th>File</th><th>Location</th></tr>
+  <tr><td>Ranked action queue</td><td><code>work/outputs/content_action_queue.csv</code></td></tr>
+  <tr><td>Full scored dataset</td><td><code>work/outputs/full_scored_dataset.csv</code></td></tr>
+  <tr><td>Playbook metrics</td><td><code>work/outputs/playbook_metrics.json</code></td></tr>
+  <tr><td>Overview figure</td><td><code>work/figures/playbook_overview.png</code></td></tr>
+</table>
+
+<p><strong>Random seed:</strong> <code>random_state=42</code> for all models. Results are deterministic given the same data and seed.</p>
+
+<h2 id="acknowledgments">8. Acknowledgments &amp; Data Credit</h2>
+
+<p>This research was built on the <strong>FlyRank ML Internship Dataset</strong>, a pseudonymized collection of content performance data from Google Search Console and Google Analytics 4. We gratefully acknowledge <a href="https://flyrank.ai" target="_blank" rel="noopener">FlyRank</a> for making this dataset available for research and educational purposes.</p>
+
+<p>The dataset contains 30,000 content items across 32 anonymized clients, with trailing-90-day metrics including impressions, clicks, sessions, position, CTR, engagement rate, and content metadata. The accompanying research paper, <em>The State of AI-Driven SEO in Numbers</em> (FlyRank, March 2026), provides the broader portfolio context that informed our methodology choices.</p>
+
+<footer>
+  <p>Built on the <a href="https://flyrank.ai" target="_blank" rel="noopener">FlyRank</a> ML Internship Dataset. All client identifiers are pseudonymized. No private data appears in this paper or its accompanying code.</p>
+  <p>Last updated: July 2026</p>
+</footer>
+
+</div>
+</body>
+</html>
