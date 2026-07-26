@@ -1,0 +1,52 @@
+{
+  "model": {
+    "type": "RandomForestClassifier",
+    "n_estimators": 200,
+    "max_depth": 10,
+    "min_samples_leaf": 20,
+    "trained_on": "all_data_for_scoring",
+    "note": "Trained on full dataset for queue generation. Evaluation metrics from W06 (client-grouped holdout) are the honest numbers."
+  },
+  "evaluation": {
+    "source": "W06_validation_audit.ipynb (client-grouped holdout)",
+    "rf_holdout_p50": 0.58,
+    "rf_holdout_auc": 0.6087,
+    "lr_holdout_p50": 0.74,
+    "lr_holdout_auc": 0.6092,
+    "cv_mean_p50": 0.708,
+    "cv_std_p50": 0.184,
+    "base_rate": 0.542,
+    "test_base_rate": 0.511,
+    "lift_over_base_rate": 0.038,
+    "n_train": 23837,
+    "n_test": 6163,
+    "n_clients_train": 25,
+    "n_clients_test": 7
+  },
+  "queue": {
+    "size": 100,
+    "actually_declining_pct": 1.0,
+    "reason_code_distribution": {
+      "VISIBILITY_DECAY": 78,
+      "REFRESH_CANDIDATE": 12,
+      "LOW_CTR_ON_PAGE1": 9,
+      "MODEL_FLAGGED": 1
+    }
+  },
+  "data": {
+    "total_items": 30000,
+    "base_rate": 0.5420666666666667,
+    "n_clients": 32,
+    "filter": "impressions_90d > 0 AND content_age_days >= 90"
+  },
+  "limits": {
+    "descriptive_not_predictive": "Features and label use overlapping time windows.",
+    "position_dominated": "Removing avg_position drops to base rate.",
+    "fragile_across_clients": "CV std 18.4%, Fold 5 P@50 only 40%.",
+    "weak_signal": "AUC ~0.61, lift 3.8 points over base rate."
+  },
+  "exports": {
+    "queue_csv": "work\\outputs\\content_action_queue.csv",
+    "full_scored_csv": "work\\outputs\\full_scored_dataset.csv"
+  }
+}
